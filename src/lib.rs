@@ -28,10 +28,11 @@ use arrow_flight::error::FlightError;
 use arrow_flight::FlightInfo;
 use arrow_schema::SchemaRef;
 use async_trait::async_trait;
-use datafusion::catalog::{Session, TableProviderFactory};
 use datafusion::common::stats::Precision;
 use datafusion::common::{DataFusionError, Statistics};
+use datafusion::datasource::provider::TableProviderFactory;
 use datafusion::datasource::TableProvider;
+use datafusion::execution::session_state::SessionState;
 use datafusion::physical_plan::ExecutionPlan;
 use datafusion_expr::{CreateExternalTable, Expr, TableType};
 use serde::{Deserialize, Serialize};
@@ -142,7 +143,7 @@ fn precision(total: i64) -> Precision<usize> {
 impl TableProviderFactory for FlightTableFactory {
     async fn create(
         &self,
-        _state: &dyn Session,
+        _state: &SessionState,
         cmd: &CreateExternalTable,
     ) -> datafusion::common::Result<Arc<dyn TableProvider>> {
         let table = self.open_table(&cmd.location, cmd.options.clone()).await?;
@@ -253,7 +254,7 @@ impl TableProvider for FlightTable {
 
     async fn scan(
         &self,
-        _state: &dyn Session,
+        _state: &SessionState,
         projection: Option<&Vec<usize>>,
         _filters: &[Expr],
         _limit: Option<usize>,
