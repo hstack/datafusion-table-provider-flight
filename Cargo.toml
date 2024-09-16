@@ -7,7 +7,9 @@ repository = "https://github.com/datafusion-contrib/datafusion-table-provider-fl
 license = "Apache-2.0"
 
 [dependencies]
+arrow = "52.2.0"
 arrow-array = "52.2.0"
+arrow-cast = "52.2.0"
 arrow-flight = { version = "52.2.0", features = ["flight-sql-experimental", "tls"] }
 arrow-schema = { version = "52.2.0", features = ["serde"] }
 async-trait = "0.1.81"
