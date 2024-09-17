@@ -177,7 +177,7 @@ async fn flight_stream(
             schema.clone(),
             grpc_headers.clone(),
         )
-            .await
+        .await
         {
             Ok(stream) => return Ok(stream),
             Err(e) => errors.push(Box::new(e)),
@@ -216,7 +216,10 @@ async fn try_fetch_stream(
     )))
 }
 
-fn enforce_schema(rb: RecordBatch, target_schema: &SchemaRef) -> arrow::error::Result<RecordBatch> {
+pub fn enforce_schema(
+    rb: RecordBatch,
+    target_schema: &SchemaRef,
+) -> arrow::error::Result<RecordBatch> {
     if target_schema.fields.is_empty() || rb.schema() == *target_schema {
         Ok(rb)
     } else if target_schema.contains(rb.schema_ref()) {
@@ -304,8 +307,10 @@ impl ExecutionPlan for FlightExec {
 mod tests {
     use crate::exec::{enforce_schema, FlightConfig, FlightPartition, FlightTicket};
     use crate::FlightProperties;
+    use arrow_array::types::Int16Type;
     use arrow_array::{
-        BooleanArray, Float32Array, Int32Array, RecordBatch, StringArray, StructArray,
+        BooleanArray, DictionaryArray, Float32Array, Int32Array, Int64Array, RecordBatch,
+        StringArray, StructArray,
     };
     use arrow_schema::{DataType, Field, Fields, Schema};
     use std::collections::HashMap;
@@ -327,7 +332,7 @@ mod tests {
                 ticket: FlightTicket("ticket2".as_bytes().into()),
             },
         ]
-            .into();
+        .into();
         let properties = FlightProperties::new(
             true,
             HashMap::from([("h1".into(), "v1".into()), ("h2".into(), "v2".into())]),
@@ -420,6 +425,55 @@ mod tests {
             broader_schema_attempt.unwrap_err().to_string(),
             "Schema error: Required field `f_extra` is missing from the flight response"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn test_dict_schema_enforcement() -> arrow::error::Result<()> {
+        let string_values = vec!["a", "a", "b", "c"];
+        let array: DictionaryArray<Int16Type> = string_values.into_iter().collect();
+
+        let data = StructArray::new(
+            Fields::from(vec![
+                Arc::new(Field::new("f_int", DataType::Int32, true)),
+                Arc::new(Field::new(
+                    "f_string",
+                    DataType::Dictionary(Box::new(DataType::Int16), Box::new(DataType::Utf8)),
+                    false,
+                )),
+            ]),
+            vec![
+                Arc::new(Int32Array::from(vec![10, 20, 30, 40])),
+                Arc::new(array),
+            ],
+            None,
+        );
+        let input_rb = RecordBatch::from(data);
+
+        let empty_schema = Arc::new(Schema::empty());
+        let same_rb = enforce_schema(input_rb.clone(), &empty_schema)?;
+        assert_eq!(input_rb, same_rb);
+
+        let coerced_rb = enforce_schema(
+            input_rb.clone(),
+            &Arc::new(Schema::new(vec![
+                // compatible yet different types with flipped nullability
+                Arc::new(Field::new("f_int", DataType::Int64, false)),
+                Arc::new(Field::new("f_string", DataType::Utf8, true)),
+            ])),
+        )?;
+        assert_ne!(input_rb, coerced_rb);
+        assert_eq!(coerced_rb.num_columns(), 2);
+        assert_eq!(coerced_rb.num_rows(), 4);
+        assert_eq!(
+            coerced_rb.column(0).as_ref(),
+            &Int64Array::from(vec![10, 20, 30, 40])
+        );
+        assert_eq!(
+            coerced_rb.column(1).as_ref(),
+            &StringArray::from(vec!["a", "a", "b", "c"])
+        );
+
         Ok(())
     }
 }

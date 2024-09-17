@@ -41,6 +41,8 @@ pub mod codec;
 mod exec;
 pub mod sql;
 
+pub use exec::enforce_schema;
+
 /// Generic Arrow Flight data source. Requires a [FlightDriver] that allows implementors
 /// to integrate any custom Flight RPC service by producing a [FlightMetadata] for some DDL.
 ///
