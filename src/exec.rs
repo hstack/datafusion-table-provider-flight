@@ -18,6 +18,7 @@
 //! Execution plan for reading flights from Arrow Flight services
 
 use std::any::Any;
+use std::env;
 use std::error::Error;
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
@@ -26,6 +27,7 @@ use std::sync::Arc;
 use crate::{FlightMetadata, FlightProperties};
 use arrow_array::RecordBatch;
 use arrow_flight::error::FlightError;
+use arrow_flight::flight_service_client::FlightServiceClient;
 use arrow_flight::{FlightClient, FlightEndpoint, Ticket};
 use arrow_schema::{ArrowError, SchemaRef};
 use datafusion::arrow::datatypes::ToByteSlice;
@@ -177,7 +179,7 @@ async fn flight_stream(
             schema.clone(),
             grpc_headers.clone(),
         )
-        .await
+            .await
         {
             Ok(stream) => return Ok(stream),
             Err(e) => errors.push(Box::new(e)),
@@ -192,6 +194,9 @@ async fn flight_stream(
     Err(DataFusionError::External(err))
 }
 
+const FLIGHT_GRPC_MAX_DECODE_SIZE_MB: &'static str = "FLIGHT_GRPC_MAX_DECODE_SIZE_MB";
+const FLIGHT_GRPC_MAX_ENCODE_SIZE_MB: &'static str = "FLIGHT_GRPC_MAX_ENCODE_SIZE_MB";
+
 async fn try_fetch_stream(
     source: impl Into<String>,
     ticket: FlightTicket,
@@ -204,7 +209,21 @@ async fn try_fetch_stream(
         .connect()
         .await
         .map_err(|e| FlightError::ExternalError(Box::new(e)))?;
-    let mut client = FlightClient::new(channel);
+
+    // TODO: extract low level client config and management to another module
+    let mut inner_client = FlightServiceClient::new(channel);
+    if let Some(max_encode_size) = env::var(FLIGHT_GRPC_MAX_DECODE_SIZE_MB)
+        .ok().and_then(|m| m.parse::<usize>().ok()) {
+        inner_client = inner_client.max_decoding_message_size(max_encode_size * 1024 * 1024);
+    }
+    if let Some(max_encode_size) = env::var(FLIGHT_GRPC_MAX_ENCODE_SIZE_MB)
+        .ok().and_then(|m| m.parse::<usize>().ok()) {
+        inner_client = inner_client.max_encoding_message_size(max_encode_size * 1024 * 1024);
+    }
+
+    // FIXME: we need to pass in Flight clients or the ability to configure clients
+    // FIXME: reuse channels that go to the same endpoint
+    let mut client = FlightClient::new_from_inner(inner_client);
     client.metadata_mut().clone_from(grpc_headers.as_ref());
     let stream = client
         .do_get(ticket)
@@ -332,7 +351,7 @@ mod tests {
                 ticket: FlightTicket("ticket2".as_bytes().into()),
             },
         ]
-        .into();
+            .into();
         let properties = FlightProperties::new(
             true,
             HashMap::from([("h1".into(), "v1".into()), ("h2".into(), "v2".into())]),
