@@ -204,7 +204,10 @@ async fn try_fetch_stream(
     grpc_headers: Arc<MetadataMap>,
 ) -> arrow_flight::error::Result<SendableRecordBatchStream> {
     let ticket = Ticket::new(ticket.0.to_vec());
+    let tls_config = tonic::transport::ClientTlsConfig::new().with_native_roots();
     let channel = Channel::from_shared(source.into())
+        .unwrap()
+        .tls_config(tls_config)
         .map_err(|e| FlightError::ExternalError(Box::new(e)))?
         .connect()
         .await

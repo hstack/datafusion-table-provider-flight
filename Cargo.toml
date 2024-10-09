@@ -7,21 +7,19 @@ repository = "https://github.com/datafusion-contrib/datafusion-table-provider-fl
 license = "Apache-2.0"
 
 [dependencies]
-arrow = "52.2.0"
-arrow-array = "52.2.0"
-arrow-cast = "52.2.0"
-arrow-flight = { version = "52.2.0", features = ["flight-sql-experimental", "tls"] }
-arrow-schema = { version = "52.2.0", features = ["serde"] }
+arrow = "53.0.0"
+arrow-array = "53.0.0"
+arrow-cast = "53.0.0"
+arrow-flight = { version = "53.0.0", features = ["flight-sql-experimental", "tls"] }
+arrow-schema = { version = "53.0.0", features = ["serde"] }
 async-trait = "0.1.81"
-base64 = "0.22.1"
-bytes = "1.7.1"
-datafusion = "41.0.0"
-datafusion-expr = "41.0.0"
-datafusion-physical-expr = "41.0.0"
-datafusion-physical-plan = "41.0.0"
-datafusion-proto = "41.0.0"
+datafusion = "42.0.0"
+datafusion-expr = "42.0.0"
+datafusion-physical-expr = "42.0.0"
+datafusion-physical-plan = "42.0.0"
+datafusion-proto = "42.0.0"
 futures = "0.3.30"
-prost = "0.12" # pinned for arrow-flight compat
+prost = "0.13.1" # pinned for arrow-flight compat
 serde = { version = "1.0.208", features = ["derive"] }
 serde_json = "1.0.125"
 tokio = { version = "1.36", features = [
@@ -32,7 +30,7 @@ tokio = { version = "1.36", features = [
     "parking_lot",
     "fs",
 ] }
-tonic = "0.11" # pinned for arrow-flight compat
+tonic = { version = "0.12.3", features = ["transport", "codegen", "prost", "tls", "tls-roots", "tls-webpki-roots"] }
 
 [dev-dependencies]
 tokio-stream = { version = "0.1.15", features = ["net"] }

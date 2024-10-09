@@ -109,8 +109,10 @@ impl FlightTableFactory {
         options: HashMap<String, String>,
     ) -> datafusion::common::Result<FlightTable> {
         let origin = entry_point.into();
+        let tls_config = tonic::transport::ClientTlsConfig::new().with_native_roots();
         let channel = Channel::from_shared(origin.clone())
             .unwrap()
+            .tls_config(tls_config).map_err(|e| DataFusionError::Internal(e.to_string()))?
             .connect()
             .await
             .map_err(|e| DataFusionError::External(Box::new(e)))?;
@@ -238,6 +240,7 @@ impl From<HashMap<String, String>> for FlightProperties {
 }
 
 /// Table provider that wraps a specific flight from an Arrow Flight service
+#[derive(Debug)]
 pub struct FlightTable {
     driver: Arc<dyn FlightDriver>,
     channel: Channel,
